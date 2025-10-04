@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Lato:wght@300;400;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    font-family: 'Roboto', 'Open Sans', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', 'Lato', sans-serif;
+  }
+}
+
+@layer components {
+  .mycontainor {
+    @apply container px-40 py-16 mx-auto;
+  }
+  
+  .farm-card {
+    @apply bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-soft-beige-200;
+  }
+  
+  .farm-button-primary {
+    @apply px-6 py-3 bg-farm-green-500 hover:bg-farm-green-600 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg;
+  }
+  
+  .farm-button-secondary {
+    @apply px-6 py-3 bg-earth-brown-950 hover:bg-earth-brown-900 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg;
+  }
+  
+  .farm-button-accent {
+    @apply px-6 py-3 bg-golden-yellow-500 hover:bg-golden-yellow-600 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg;
+  }
+  
+  .hero-gradient {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(141, 110, 99, 0.1) 100%);
+  }
+}

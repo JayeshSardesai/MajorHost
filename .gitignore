@@ -1,0 +1,51 @@
+# Dependency directories
+# These folders are installed automatically and can be very large
+/Backend/node_modules/
+/landing/node_modules/
+node_modules/
+
+# Python virtual environment folders
+# These are specific to your local machine
+venv/
+env/
+.venv/
+.env/
+
+# Python cache files
+pycache/
+*.pyc
+
+# Environment variable files
+# These contain secret keys and should NEVER be pushed to GitHub
+.env
+.env.*
+
+# Keep the example file so others know what variables are needed
+!.env.example
+
+# Build output from Vite/React
+# This is generated automatically when you build the frontend
+/landing/dist/
+
+# Log files
+.log
+npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+
+# User Uploads
+# This folder will be created on the server; no need to track uploaded images
+/Backend/uploads/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Editor and IDE directories
+.vscode/
+.idea/
+
+# Non-project files
+# Ignore any Word or PDF documents
+*.docx
+*.pdf

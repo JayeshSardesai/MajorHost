@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Leaf, Sun } from 'lucide-react';
 import T from './T';
 import { useTranslation } from 'react-i18next';
-
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const Login = () => {
     const { t } = useTranslation();
     const [formData, setFormData] = useState({
@@ -29,7 +29,7 @@ const Login = () => {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:5000/api/login', {
+            const response = await fetch(`${apiUrl}/api/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -43,7 +43,7 @@ const Login = () => {
                 // Store token in localStorage
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
-                
+
                 // Redirect to dashboard
                 navigate('/dashboard');
             } else {

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, Leaf, Sun } from 'lucide-react';
 import T from './T';
 import { useTranslation } from 'react-i18next';
-
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const Signup = () => {
     const { t } = useTranslation();
     const [formData, setFormData] = useState({
@@ -35,7 +35,7 @@ const Signup = () => {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:5000/api/send-otp', {
+            const response = await fetch(`${apiUrl}/api/send-otp`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -64,7 +64,7 @@ const Signup = () => {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:5000/api/check-otp', {
+            const response = await fetch(`${apiUrl}/api/check-otp`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -101,7 +101,7 @@ const Signup = () => {
         }
 
         try {
-            const response = await fetch('http://localhost:5000/api/complete-signup', {
+            const response = await fetch(`${apiUrl}/api/complete-signup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

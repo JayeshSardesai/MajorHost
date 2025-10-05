@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, selectedLocationData }) => {
   const mapRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -14,11 +14,11 @@ const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, select
     if (!window.google || !window.google.maps || !mapRef.current || !mapInstanceRef.current) return;
 
     const map = mapInstanceRef.current;
-    
+
     // Clear existing markers
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
-    
+
     // Create marker for selected location
     const marker = new window.google.maps.Marker({
       position: { lat: locationData.coordinates.lat, lng: locationData.coordinates.lng },
@@ -86,37 +86,37 @@ const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, select
     const initializeMap = () => {
       if (!mapRef.current) return;
 
-        try {
-          // Use coordinates if available, otherwise try to get user's location
-          let center = coordinates && coordinates.lat && coordinates.lng 
-            ? { lat: coordinates.lat, lng: coordinates.lng }
-            : { lat: 20.5937, lng: 78.9629 }; // Default India center
+      try {
+        // Use coordinates if available, otherwise try to get user's location
+        let center = coordinates && coordinates.lat && coordinates.lng
+          ? { lat: coordinates.lat, lng: coordinates.lng }
+          : { lat: 20.5937, lng: 78.9629 }; // Default India center
 
-          // If no coordinates provided, try to get user's current location
-          if (!coordinates || !coordinates.lat || !coordinates.lng) {
-            if (navigator.geolocation) {
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  center = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                  };
-                  // Update map center to user's location
-                  if (mapInstanceRef.current) {
-                    mapInstanceRef.current.setCenter(center);
-                    mapInstanceRef.current.setZoom(12);
-                  }
-                },
-                (error) => {
-                  console.log('Geolocation error:', error);
-                  // Keep default center if geolocation fails
+        // If no coordinates provided, try to get user's current location
+        if (!coordinates || !coordinates.lat || !coordinates.lng) {
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                center = {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude
+                };
+                // Update map center to user's location
+                if (mapInstanceRef.current) {
+                  mapInstanceRef.current.setCenter(center);
+                  mapInstanceRef.current.setZoom(12);
                 }
-              );
-            }
+              },
+              (error) => {
+                console.log('Geolocation error:', error);
+                // Keep default center if geolocation fails
+              }
+            );
           }
+        }
 
-          console.log('🗺️ Map coordinates received:', coordinates);
-          console.log('🗺️ Map center being used:', center);
+        console.log('🗺️ Map coordinates received:', coordinates);
+        console.log('🗺️ Map center being used:', center);
 
         const map = new window.google.maps.Map(mapRef.current, {
           zoom: coordinates && coordinates.lat && coordinates.lng ? 12 : 6,
@@ -188,9 +188,9 @@ const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, select
         const mapClickHandler = async (event) => {
           const clickedLat = event.latLng.lat();
           const clickedLng = event.latLng.lng();
-          
+
           console.log(`🗺️ Map clicked at: ${clickedLat}, ${clickedLng}`);
-          
+
           // Show loading indicator
           const loadingInfoWindow = new window.google.maps.InfoWindow({
             content: `
@@ -204,12 +204,12 @@ const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, select
             `,
             position: { lat: clickedLat, lng: clickedLng }
           });
-          
+
           loadingInfoWindow.open(map);
-          
+
           try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:5000/api/region-data/${clickedLat}/${clickedLng}/${encodeURIComponent(cropName)}`, {
+            const response = await fetch(`${apiUrl}/api/region-data/${clickedLat}/${clickedLng}/${encodeURIComponent(cropName)}`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -217,16 +217,16 @@ const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, select
             });
 
             loadingInfoWindow.close();
-            
+
             if (response.ok) {
               const regionData = await response.json();
               console.log('🗺️ Region data received:', regionData);
-              
+
               // Create popup content for clicked location data
               const isAboveThreshold = regionData.production.actual >= regionData.production.threshold;
               const opportunityColor = isAboveThreshold ? '#ef4444' : '#22c55e';
               const opportunityBg = isAboveThreshold ? '#fef2f2' : '#f0fdf4';
-              
+
               const regionInfoWindow = new window.google.maps.InfoWindow({
                 content: `
                   <div style="padding: 6px; font-family: 'Poppins', sans-serif; max-width: 200px;">
@@ -259,14 +259,14 @@ const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, select
 
               // Close any existing info windows
               infoWindow.close();
-              
+
               // Open region info window
               regionInfoWindow.open(map);
-              
+
               console.log('✅ Region data popup displayed');
             } else {
               console.error('❌ Failed to fetch region data:', response.statusText);
-              
+
               // Show error popup
               const errorInfoWindow = new window.google.maps.InfoWindow({
                 content: `
@@ -282,7 +282,7 @@ const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, select
           } catch (error) {
             loadingInfoWindow.close();
             console.error('❌ Error fetching region data:', error);
-            
+
             // Show error popup
             const errorInfoWindow = new window.google.maps.InfoWindow({
               content: `
@@ -299,7 +299,7 @@ const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, select
 
         // Add the click listener with proper event handling
         map.addListener('click', mapClickHandler);
-        
+
         // Ensure map is interactive
         map.setOptions({
           draggable: true,
@@ -323,14 +323,14 @@ const InteractiveMap = ({ coordinates, locationName, cropName, showPopup, select
   useEffect(() => {
     if (showPopup && selectedLocationData && window.google && window.google.maps && mapInstanceRef.current) {
       const map = mapInstanceRef.current;
-      
+
       // Update map center to selected location
       map.setCenter({
         lat: selectedLocationData.coordinates.lat,
         lng: selectedLocationData.coordinates.lng
       });
       map.setZoom(12);
-      
+
       // Show popup for selected location
       showLocationPopup(selectedLocationData);
     }

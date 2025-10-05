@@ -4,27 +4,48 @@ import pickle
 import pandas as pd
 from predict_pipeline import LogEnsemblePredictor
 
-# Initialize the Flask application
 app = Flask(__name__)
-# Enable CORS to allow requests from your frontend's domain
 CORS(app)
 
-# --- SECTION 1: YIELD PREDICTION MODEL ---
-# Load all artifacts for the yield prediction model
-yield_predictor = LogEnsemblePredictor(
-    categorical_cols_path="categorical_cols.pkl",
-    xtrain_engineered_log_cols_path="X_train_engineered_log_cols.pkl",
-    ensemble_models_path="log_transformed_averaging_ensemble_models.pkl"
-)
+# --- LAZY LOADING SETUP ---
+# We initialize the models as None. They will only be loaded into memory when needed.
+_yield_predictor = None
+_crop_model = None
+_xtrain_columns = None
 
-# API endpoint for predicting crop yield
+def get_yield_predictor():
+    """Loads the yield prediction model on the first request."""
+    global _yield_predictor
+    if _yield_predictor is None:
+        print("🚀 Loading Yield Prediction model for the first time...")
+        _yield_predictor = LogEnsemblePredictor(
+            categorical_cols_path="categorical_cols.pkl",
+            xtrain_engineered_log_cols_path="X_train_engineered_log_cols.pkl",
+            ensemble_models_path="log_transformed_averaging_ensemble_models.pkl"
+        )
+        print("✅ Yield Prediction model loaded successfully.")
+    return _yield_predictor
+
+def get_crop_model():
+    """Loads the crop recommendation model on the first request."""
+    global _crop_model, _xtrain_columns
+    if _crop_model is None:
+        print("🚀 Loading Crop Recommendation model for the first time...")
+        with open("new_voting_classifier.pkl", "rb") as f:
+            _crop_model = pickle.load(f)
+        with open("X_train_columns.pkl", "rb") as f:
+            _xtrain_columns = pickle.load(f)
+        print("✅ Crop Recommendation model loaded successfully.")
+    return _crop_model, _xtrain_columns
+
+# --- API ROUTES ---
+
 @app.route("/api/predict-yield", methods=["POST"])
 def api_predict_yield():
-    """
-    Expects a JSON payload with Area, State_Name, District_Name, Season, and Crop.
-    Returns the predicted yield as JSON.
-    """
     try:
+        # Load the model (only if it's not already in memory)
+        predictor = get_yield_predictor()
+        
         data = request.get_json(force=True)
         row = {
             "Area": float(data["Area"]),
@@ -33,58 +54,34 @@ def api_predict_yield():
             "Season": data["Season"],
             "Crop": data["Crop"]
         }
-        pred = yield_predictor.predict_from_row(row)
+        pred = predictor.predict_from_row(row)
         return jsonify({"predicted_yield": pred})
     except Exception as e:
-        # Return a clear error message if something goes wrong
+        print(f"❌ Error in /api/predict-yield: {e}")
         return jsonify({"error": str(e)}), 400
 
-
-# --- SECTION 2: CROP RECOMMENDATION MODEL ---
-# Load all artifacts for the crop recommendation model
-with open("new_voting_classifier.pkl", "rb") as f:
-    crop_model = pickle.load(f)
-with open("X_train_columns.pkl", "rb") as f:
-    X_train_columns = pickle.load(f)
-
-# API endpoint for recommending a crop
 @app.route("/api/recommend-crop", methods=["POST"])
 def api_recommend_crop():
-    """
-    Expects a JSON payload with soil and weather data.
-    Returns the best crop prediction and a dictionary of the top 5 crop probabilities.
-    """
     try:
+        # Load the model (only if it's not already in memory)
+        model, xtrain_columns = get_crop_model()
+
         data = request.get_json(force=True)
-        
-        # Create a DataFrame from the incoming JSON data
         data_sample = {
-            "SOIL_PH": [float(data["SOIL_PH"])],
-            "TEMP": [float(data["TEMP"])],
-            "RELATIVE_HUMIDITY": [float(data["RELATIVE_HUMIDITY"])],
-            "N": [float(data["N"])],
-            "P": [float(data["P"])],
-            "K": [float(data["K"])],
-            "SOIL": [data["SOIL"]],
+            "SOIL_PH": [float(data["SOIL_PH"])], "TEMP": [float(data["TEMP"])],
+            "RELATIVE_HUMIDITY": [float(data["RELATIVE_HUMIDITY"])], "N": [float(data["N"])],
+            "P": [float(data["P"])], "K": [float(data["K"])], "SOIL": [data["SOIL"]],
             "SEASON": [data["SEASON"]]
         }
         sample_df = pd.DataFrame(data_sample)
-
-        # Preprocess the data exactly like the training data
         categorical_cols_sample = sample_df.select_dtypes(include=['object']).columns
         sample_df = pd.get_dummies(sample_df, columns=categorical_cols_sample, drop_first=True)
-        # Align columns with the training set, filling missing ones with 0
-        sample_df = sample_df.reindex(columns=X_train_columns, fill_value=0)
+        sample_df = sample_df.reindex(columns=xtrain_columns, fill_value=0)
         
-        # Get prediction probabilities for all crops
-        probabilities = crop_model.predict_proba(sample_df)[0]
-        class_labels = crop_model.classes_
-        
-        # Create a dictionary of crops and their probabilities
+        probabilities = model.predict_proba(sample_df)[0]
+        class_labels = model.classes_
         probability_series = pd.Series(probabilities, index=class_labels)
         top_crops = probability_series.sort_values(ascending=False).head(5).round(3).to_dict()
-        
-        # The best prediction is the one with the highest probability
         prediction = max(top_crops, key=top_crops.get)
         
         return jsonify({
@@ -92,9 +89,8 @@ def api_recommend_crop():
             "top_5_crops": top_crops
         })
     except Exception as e:
+        print(f"❌ Error in /api/recommend-crop: {e}")
         return jsonify({"error": str(e)}), 400
 
-
-# This block is for local testing and will not be used by the Gunicorn server on Render
 if __name__ == "__main__":
-    app.run(debug=False, port=5001)
+    app.run(debug=False)

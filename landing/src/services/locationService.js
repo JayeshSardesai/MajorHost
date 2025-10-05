@@ -32,7 +32,7 @@ class LocationService {
     cacheLocation(locationData) {
         this.cache.location = locationData;
         this.cache.timestamp = Date.now();
-        
+
         // Also store in localStorage for persistence
         try {
             localStorage.setItem('locationCache', JSON.stringify({
@@ -72,7 +72,7 @@ class LocationService {
     async scanWiFiNetworks() {
         try {
             console.log('📡 Attempting to scan Wi-Fi networks...');
-            
+
             // Check if navigator.wifi is available (experimental API)
             if ('wifi' in navigator) {
                 const networks = await navigator.wifi.getNetworks();
@@ -83,7 +83,7 @@ class LocationService {
                         signalStrength: network.signalStrength,
                         channel: network.channel || 0
                     }));
-                
+
                 console.log(`📡 Found ${wifiAccessPoints.length} Wi-Fi networks via Web API`);
                 return wifiAccessPoints;
             }
@@ -112,7 +112,7 @@ class LocationService {
                 });
 
                 const networkInfo = [];
-                
+
                 pc.onicecandidate = (event) => {
                     if (event.candidate) {
                         const candidate = event.candidate.candidate;
@@ -156,7 +156,7 @@ class LocationService {
             }
 
             console.log('🛰️ Using browser geolocation (GPS)...');
-            
+
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const { latitude, longitude, accuracy } = position.coords;
@@ -194,8 +194,8 @@ class LocationService {
             if (token) {
                 headers['Authorization'] = `Bearer ${token}`;
             }
-
-            let url = 'http://localhost:5000/api/location';
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            let url = `${apiUrl}/api/location`;
             let method = 'GET';
             let body = null;
 
@@ -219,7 +219,7 @@ class LocationService {
             }
 
             const data = await response.json();
-            
+
             if (data.success && data.coordinates) {
                 console.log(`✅ Backend location successful via ${data.locationSource}`);
                 return {
@@ -256,7 +256,7 @@ class LocationService {
             try {
                 console.log('🔄 Step 1: Attempting Wi-Fi triangulation...');
                 const wifiNetworks = await this.scanWiFiNetworks();
-                
+
                 if (wifiNetworks.length > 0) {
                     // Send Wi-Fi data to backend for triangulation
                     locationResult = await this.getLocationViaBackend(wifiNetworks);
@@ -274,10 +274,11 @@ class LocationService {
                 try {
                     console.log('🔄 Step 2: Wi-Fi failed, using browser GPS fallback...');
                     const browserLocation = await this.getBrowserLocation();
-                    
+                    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
                     // Get address information from backend using GPS coordinates
                     try {
-                        const addressResponse = await fetch('http://localhost:5000/api/location', {
+                        const addressResponse = await fetch(`${apiUrl}/api/location`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -326,7 +327,7 @@ class LocationService {
 
             // Cache the successful result
             this.cacheLocation(locationResult);
-            
+
             console.log(`✅ Location detection successful via ${locationResult.locationSource}`);
             return locationResult;
 
@@ -352,7 +353,7 @@ class LocationService {
     async getCurrentLocationWithTimeout(timeoutMs = 15000) {
         return Promise.race([
             this.getCurrentLocation(),
-            new Promise((_, reject) => 
+            new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Location detection timeout')), timeoutMs)
             )
         ]);

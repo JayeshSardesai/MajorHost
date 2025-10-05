@@ -4,6 +4,7 @@ import T from './T';
 import Navbar from './Navbar';
 import { useTranslation } from 'react-i18next';
 import { getCropLabelFromName } from '../constants/crops';
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const SelectCrop = () => {
   const navigate = useNavigate();
@@ -32,11 +33,11 @@ const SelectCrop = () => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { navigate('/'); return; }
-    
+
     const loadData = async () => {
       try {
         // Load user profile
-        const resp = await fetch('http://localhost:5000/api/profile', {
+        const resp = await fetch(`${apiUrl}/api/profile`, {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
         if (resp.ok) {
@@ -44,10 +45,10 @@ const SelectCrop = () => {
           setCrop(data.profile?.crop ?? '');
           setAreaHectare(data.profile?.areaHectare ?? '');
         }
-        
+
         // Load user's existing crops to check limits
         try {
-          const cropsResp = await fetch('http://localhost:5000/api/user-crops', {
+          const cropsResp = await fetch(`${apiUrl}/api/user-crops`, {
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
           });
           if (cropsResp.ok) {
@@ -62,7 +63,7 @@ const SelectCrop = () => {
 
         // Load location data from weather API
         try {
-          const locationResp = await fetch('http://localhost:5000/api/location');
+          const locationResp = await fetch(`${apiUrl}/api/location`);
           const locationData = await locationResp.json();
           if (locationData?.success && locationData.address) {
             const locationInfo = {
@@ -77,7 +78,7 @@ const SelectCrop = () => {
         } catch (locError) {
           console.warn('Failed to load location data:', locError);
         }
-        
+
         // Load available crops from cached predictions
         const cachedPredictions = localStorage.getItem('cropPredictions');
         if (cachedPredictions) {
@@ -94,21 +95,21 @@ const SelectCrop = () => {
           } catch (parseError) {
             console.error('Failed to parse cached predictions:', parseError);
             // Fallback to default crops if parsing fails
-            setAvailableCrops(['cowpea','tomato','onion','cabbage','bhendi','brinjal','bottle gourd','bitter gourd','cucumber','cluster bean','peas','french bean','carrot','radish','cauliflower','small onion','sweet potato']);
+            setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
           }
         } else {
           // No cached predictions, use default crops
-          setAvailableCrops(['cowpea','tomato','onion','cabbage','bhendi','brinjal','bottle gourd','bitter gourd','cucumber','cluster bean','peas','french bean','carrot','radish','cauliflower','small onion','sweet potato']);
+          setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
         }
       } catch (e) {
         console.error('Failed to load data:', e);
         // Fallback to default crops on error
-        setAvailableCrops(['cowpea','tomato','onion','cabbage','bhendi','brinjal','bottle gourd','bitter gourd','cucumber','cluster bean','peas','french bean','carrot','radish','cauliflower','small onion','sweet potato']);
+        setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
       } finally {
         setLoading(false);
       }
     };
-    
+
     loadData();
   }, [navigate]);
 
@@ -127,15 +128,15 @@ const SelectCrop = () => {
 
     try {
       const token = localStorage.getItem('token');
-      
+
       // Get location data first using Google API
-      const locationResponse = await fetch('http://localhost:5000/api/location', {
+      const locationResponse = await fetch(`${apiUrl}/api/location`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       let locationData = {};
       if (locationResponse.ok) {
         const locData = await locationResponse.json();
@@ -150,7 +151,7 @@ const SelectCrop = () => {
         }
       }
 
-      const response = await fetch('http://localhost:5000/api/production-estimation', {
+      const response = await fetch(`${apiUrl}/api/production-estimation`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -169,7 +170,7 @@ const SelectCrop = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Crop saved successfully with location:', data);
-        
+
         // Set a flag to indicate fresh crop was added
         localStorage.setItem('freshCropAdded', 'true');
         localStorage.setItem('lastCropAdded', JSON.stringify({
@@ -177,13 +178,13 @@ const SelectCrop = () => {
           area: areaHectare,
           timestamp: new Date().toISOString()
         }));
-        
+
         // Navigate back to dashboard without clearing cache
         navigate('/dashboard');
       } else {
         const errorData = await response.json();
         console.error('❌ Failed to save crop:', errorData);
-        
+
         // Handle specific error types
         if (errorData.error === 'Area limit exceeded') {
           alert(`⚠️ ${errorData.error}\n\n${errorData.details}\n\nYou entered: ${errorData.providedArea} hectares\nMaximum allowed: ${errorData.maxArea} hectares`);
@@ -224,7 +225,7 @@ const SelectCrop = () => {
             <h1 className="text-2xl font-bold text-foreground font-poppins"><T k="selectCrop.title">Select Crop</T></h1>
           </div>
           {error && <div className="mb-4 text-red-600">{error}</div>}
-          
+
           {/* Crop and Area Limits Info */}
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
             <div className="flex items-center justify-between">
@@ -261,13 +262,13 @@ const SelectCrop = () => {
               </p>
             </div>
           )}
-          
+
           <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1 font-poppins"><T k="selectCrop.cropToGrow">Crop to Grow</T></label>
-              <select 
-                value={crop} 
-                onChange={(e)=>setCrop(e.target.value)} 
+              <select
+                value={crop}
+                onChange={(e) => setCrop(e.target.value)}
                 className="w-full px-3 py-2 border border-soft-beige-300 rounded-md focus:ring-2 focus:ring-farm-green-500 focus:border-transparent"
                 required
               >
@@ -284,23 +285,23 @@ const SelectCrop = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1 font-poppins"><T k="selectCrop.areaHectares">Area (Hectares)</T></label>
-              <input 
-                type="number" 
-                value={areaHectare} 
-                onChange={(e)=>setAreaHectare(e.target.value)} 
-                className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" 
-                placeholder={t('selectCrop.areaPlaceholder', 'e.g., 2')} 
+              <input
+                type="number"
+                value={areaHectare}
+                onChange={(e) => setAreaHectare(e.target.value)}
+                className="w-full px-3 py-2 border border-soft-beige-300 rounded-md"
+                placeholder={t('selectCrop.areaPlaceholder', 'e.g., 2')}
                 min="0.1"
                 max="2"
                 step="0.1"
-                required 
+                required
               />
               <p className="text-xs text-muted-500 mt-1 font-poppins">
                 <T k="selectCrop.maxAreaNote">Maximum allowed: 2 hectares per crop selection</T>
               </p>
             </div>
             <div className="flex justify-end gap-3">
-              <button type="button" onClick={()=>navigate('/dashboard')} className="px-4 py-2 border rounded-md"><T k="common.cancel">Cancel</T></button>
+              <button type="button" onClick={() => navigate('/dashboard')} className="px-4 py-2 border rounded-md"><T k="common.cancel">Cancel</T></button>
               <button type="submit" className="farm-button-primary px-4 py-2"><T k="common.save">Save</T></button>
             </div>
           </form>

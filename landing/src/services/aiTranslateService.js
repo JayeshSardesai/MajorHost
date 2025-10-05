@@ -7,8 +7,9 @@
 export async function aiTranslate(text, targetLang) {
   try {
     if (!text || !targetLang) return text || '';
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-    const res = await fetch('http://localhost:5000/api/ai-translate', {
+    const res = await fetch(`${apiUrl}/api/ai-translate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, targetLang })
@@ -46,5 +47,5 @@ export function setCachedTranslation(text, targetLang, translated) {
   try {
     const key = `ai_tx:${targetLang}:${text}`;
     localStorage.setItem(key, JSON.stringify({ translated, ts: Date.now() }));
-  } catch {}
+  } catch { }
 }

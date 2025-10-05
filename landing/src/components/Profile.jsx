@@ -5,6 +5,7 @@ import { Menu, X, Leaf, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import T from './T';
 import LanguageSwitcher from './LanguageSwitcher';
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ const Profile = () => {
     if (!token) { navigate('/'); return; }
     (async () => {
       try {
-        const resp = await fetch('http://localhost:5000/api/profile', {
+        const resp = await fetch(`${apiUrl}/api/profile`, {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
         if (resp.ok) {
@@ -55,7 +56,7 @@ const Profile = () => {
     setError('');
     try {
       const token = localStorage.getItem('token');
-      const resp = await fetch('http://localhost:5000/api/profile', {
+      const resp = await fetch(`${apiUrl}/api/profile`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -71,7 +72,7 @@ const Profile = () => {
       // Clear cached predictions to force refresh on dashboard
       localStorage.removeItem('cropPredictions');
       localStorage.removeItem('productionEstimates');
-      
+
       setIsEditing(false);
       navigate('/dashboard');
     } catch (e) {
@@ -82,21 +83,21 @@ const Profile = () => {
   const handleUpload = async (file) => {
     if (!file) return;
     if (!isEditing) return;
-    
+
     setUploadingPhoto(true);
     setError('');
-    
+
     try {
       const token = localStorage.getItem('token');
       const form = new FormData();
       form.append('farmerCard', file);
-      
-      const resp = await fetch('http://localhost:5000/api/profile/farmercard', {
+
+      const resp = await fetch(`${apiUrl}/api/profile/farmercard`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: form
       });
-      
+
       if (resp.ok) {
         const data = await resp.json();
         if (data.success && data.photoUrl) {
@@ -140,41 +141,41 @@ const Profile = () => {
                 <label className="block text-sm font-medium text-foreground mb-1 font-poppins">
                   <T k="profile.nitrogen">Nitrogen (N)</T>
                 </label>
-                <input type="number" value={profile.nitrogen} onChange={(e)=>setProfile({...profile, nitrogen: e.target.value})} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
+                <input type="number" value={profile.nitrogen} onChange={(e) => setProfile({ ...profile, nitrogen: e.target.value })} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1 font-poppins">
                   <T k="profile.phosphorus">Phosphorus (P)</T>
                 </label>
-                <input type="number" value={profile.phosphorus} onChange={(e)=>setProfile({...profile, phosphorus: e.target.value})} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
+                <input type="number" value={profile.phosphorus} onChange={(e) => setProfile({ ...profile, phosphorus: e.target.value })} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1 font-poppins">
                   <T k="profile.potassium">Potassium (K)</T>
                 </label>
-                <input type="number" value={profile.potassium} onChange={(e)=>setProfile({...profile, potassium: e.target.value})} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
+                <input type="number" value={profile.potassium} onChange={(e) => setProfile({ ...profile, potassium: e.target.value })} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1 font-poppins">
                   <T k="profile.areaHectare">Area (Hectares)</T>
                 </label>
-                <input type="number" value={profile.areaHectare} onChange={(e)=>setProfile({...profile, areaHectare: e.target.value})} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
+                <input type="number" value={profile.areaHectare} onChange={(e) => setProfile({ ...profile, areaHectare: e.target.value })} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1 font-poppins">
                   <T k="profile.ph">pH Level</T>
                 </label>
-                <input type="number" step="0.1" value={profile.ph} onChange={(e)=>setProfile({...profile, ph: e.target.value})} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
+                <input type="number" step="0.1" value={profile.ph} onChange={(e) => setProfile({ ...profile, ph: e.target.value })} className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" required disabled={!isEditing} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1 font-poppins">
                   <T k="profile.soilType">Soil Type</T>
                 </label>
-                <select 
-                  value={profile.soilType} 
-                  onChange={(e)=>setProfile({...profile, soilType: e.target.value})} 
-                  className="w-full px-3 py-2 border border-soft-beige-300 rounded-md" 
-                  required 
+                <select
+                  value={profile.soilType}
+                  onChange={(e) => setProfile({ ...profile, soilType: e.target.value })}
+                  className="w-full px-3 py-2 border border-soft-beige-300 rounded-md"
+                  required
                   disabled={!isEditing}
                 >
                   <option value=""><T k="profile.selectSoil">Select soil type</T></option>
@@ -193,26 +194,26 @@ const Profile = () => {
               <label className="block text-sm font-medium text-foreground mb-1 font-poppins">
                 <T k="profile.farmerCardPhoto">Farmer Card Photo</T>
               </label>
-              
+
               {/* Photo Preview */}
               {profile.photoUrl && (
                 <div className="mb-3">
-                  <img 
-                    src={`http://localhost:5000${profile.photoUrl}`} 
-                    alt="Farmer Card" 
+                  <img
+                    src={`${apiUrl}${profile.photoUrl}`}
+                    alt="Farmer Card"
                     className="w-32 h-32 object-cover rounded-lg border border-soft-beige-300"
                   />
                 </div>
               )}
-              
+
               {/* File Input */}
               <div className="flex items-center space-x-2">
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={(e)=>handleUpload(e.target.files?.[0])} 
-                  className="block w-full text-sm text-muted-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-farm-green-50 file:text-farm-green-700 hover:file:bg-farm-green-100" 
-                  disabled={!isEditing || uploadingPhoto} 
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleUpload(e.target.files?.[0])}
+                  className="block w-full text-sm text-muted-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-farm-green-50 file:text-farm-green-700 hover:file:bg-farm-green-100"
+                  disabled={!isEditing || uploadingPhoto}
                 />
                 {uploadingPhoto && (
                   <div className="flex items-center space-x-2 text-sm text-muted-600">
@@ -221,20 +222,20 @@ const Profile = () => {
                   </div>
                 )}
               </div>
-              
+
               <p className="text-xs text-muted-600 mt-1 font-poppins">
                 <T k="profile.uploadHelp">Upload a clear photo of your farmer identification card</T>
               </p>
             </div>
             <div className="flex justify-end gap-3">
               {!isEditing && (
-                <button type="button" onClick={()=>setIsEditing(true)} className="farm-button-primary px-4 py-2">
+                <button type="button" onClick={() => setIsEditing(true)} className="farm-button-primary px-4 py-2">
                   <T k="profile.update">Update</T>
                 </button>
               )}
               {isEditing && (
                 <>
-                  <button type="button" onClick={()=>{ setIsEditing(false); }} className="px-4 py-2 border rounded-md">
+                  <button type="button" onClick={() => { setIsEditing(false); }} className="px-4 py-2 border rounded-md">
                     <T k="common.cancel">Cancel</T>
                   </button>
                   <button type="submit" className="farm-button-primary px-4 py-2">

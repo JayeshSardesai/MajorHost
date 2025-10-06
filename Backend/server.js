@@ -1245,8 +1245,8 @@ app.post('/api/production-estimation', authenticateToken, async (req, res) => {
         const mlResponse = await axios.post(`${process.env.ML_API_URL}/api/predict-yield`, estimationData);
         console.log('📊 Production estimation response:', mlResponse.data);
 
-        if (mlResponse.data && mlResponse.data.prediction !== undefined) {
-            const estimatedYieldPerHectare = mlResponse.data.prediction;
+        if (mlResponse.data && mlResponse.data.predicted_yield !== undefined) {
+            const estimatedYieldPerHectare = mlResponse.data.predicted_yield;
             const actualYield = estimatedYieldPerHectare * scalingFactor; // Scale for actual area
 
             // Determine production cycle

@@ -1,96 +1,83 @@
-import { useState, useEffect, useCallback } from 'react';
-import locationService from '../services/locationService';
+// In landing/src/hooks/useLocation.ts
 
-export interface LocationData {
-    lat: number;
-    lng: number;
-    accuracy?: number;
-    method?: string;
-    locationSource?: string;
-    address?: {
-        state?: string;
-        district?: string;
+import { useState, useEffect } from 'react';
+import axios, { AxiosError } from 'axios';
+
+// Define a type for your location data for better type safety
+interface LocationData {
+    success: boolean;
+    coordinates: {
+        lat: number;
+        lng: number;
+        accuracy: number;
     };
-    mapUrl?: string;
+    address: {
+        state: string;
+        district: string;
+    };
+    mapUrl: string;
+    method: string;
+    locationSource: string;
 }
 
-export interface UseLocationOptions {
-    autoFetch?: boolean;
-    timeout?: number;
-    enableCache?: boolean;
-}
-
-export interface UseLocationReturn {
-    location: LocationData | null;
-    loading: boolean;
-    error: string | null;
-    fetchLocation: (forceRefresh?: boolean) => Promise<LocationData>;
-    refreshLocation: () => Promise<LocationData>;
-    isLocationAvailable: boolean;
-    coordinates: { lat: number; lng: number } | null;
-    address: { state?: string; district?: string } | null;
-    locationSource: string | null;
-}
-
-/**
- * React hook for location detection with Wi-Fi triangulation + GPS fallback
- */
-export const useLocation = (options: UseLocationOptions = {}): UseLocationReturn => {
-    const {
-        autoFetch = true,
-        timeout = 15000,
-        enableCache = true
-    } = options;
-
-    const [location, setLocation] = useState<LocationData | null>(null);
-    const [loading, setLoading] = useState<boolean>(false);
+const useLocation = () => {
+    // Explicitly type the state variables
+    const [locationData, setLocationData] = useState<LocationData | null>(null);
     const [error, setError] = useState<string | null>(null);
-
-    const fetchLocation = useCallback(async (forceRefresh = false): Promise<LocationData> => {
-        try {
-            setLoading(true);
-            setError(null);
-
-            let locationData: LocationData;
-            if (forceRefresh) {
-                locationData = await locationService.refreshLocation();
-            } else {
-                locationData = await locationService.getCurrentLocationWithTimeout(timeout);
-            }
-
-            setLocation(locationData);
-            return locationData;
-        } catch (err: any) {
-            const errorMessage = err.message || 'Failed to get location';
-            setError(errorMessage);
-            console.error('useLocation error:', errorMessage);
-            throw err;
-        } finally {
-            setLoading(false);
-        }
-    }, [timeout]);
-
-    const refreshLocation = useCallback((): Promise<LocationData> => {
-        return fetchLocation(true);
-    }, [fetchLocation]);
+    const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
-        if (autoFetch) {
-            fetchLocation();
-        }
-    }, [autoFetch, fetchLocation]);
+        const fetchLocation = () => {
+            if (!navigator.geolocation) {
+                setError('Geolocation is not supported by your browser.');
+                setLoading(false);
+                return;
+            }
 
-    return {
-        location,
-        loading,
-        error,
-        fetchLocation,
-        refreshLocation,
-        isLocationAvailable: !!location,
-        coordinates: location ? { lat: location.lat, lng: location.lng } : null,
-        address: location?.address || null,
-        locationSource: location?.locationSource || null
-    };
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    try {
+                        const { latitude, longitude } = position.coords;
+                        const token = localStorage.getItem('token');
+
+                        const response = await axios.post<LocationData>(
+                            `${import.meta.env.VITE_API_URL}/api/location`,
+                            {
+                                latitude: latitude,
+                                longitude: longitude,
+                            },
+                            {
+                                headers: { Authorization: `Bearer ${token}` },
+                            }
+                        );
+
+                        setLocationData(response.data);
+                    } catch (apiError) {
+                        // Handle potential Axios errors to get a useful message
+                        if (axios.isAxiosError(apiError)) {
+                            const axiosError = apiError as AxiosError<{ error?: string }>;
+                            const serverError = axiosError.response?.data?.error || 'An unknown server error occurred.';
+                            setError(serverError);
+                        } else {
+                            setError('Could not fetch location details from the server.');
+                        }
+                        console.error('API Error:', apiError);
+                    } finally {
+                        setLoading(false);
+                    }
+                },
+                (geoError) => {
+                    // The geoError.message is a string, which now matches our state type
+                    setError(geoError.message || 'Could not get device location.');
+                    setLoading(false);
+                }
+            );
+        };
+
+        fetchLocation();
+    }, []);
+
+    return { locationData, error, loading };
 };
 
 export default useLocation;

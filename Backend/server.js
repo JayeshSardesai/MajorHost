@@ -12,18 +12,8 @@ const session = require('express-session');
 // const MongoStore = require('connect-mongo'); // Temporarily commented out
 const cropMapRouter = require('./crop-map-api');
 const nodemailer = require('nodemailer');
-let wifi;
-try {
-    wifi = require('node-wifi');
-    wifi.init({
-        iface: null,
-        debug: false,
-        executionDelay: 500
-    });
-} catch (e) {
-    console.warn('node-wifi not installed or failed to init; falling back to IP-only geolocation');
-    wifi = null;
-}
+let wifi = null;
+
 const app = express();
 
 // MongoDB Connection
@@ -495,81 +485,7 @@ app.get('/api/dashboard', authenticateToken, (req, res) => {
 });
 
 // Wi-Fi triangulation location detection function
-async function getWiFiLocation() {
-    try {
-        if (!wifi) {
-            console.log('⚠️ node-wifi not available, skipping Wi-Fi triangulation');
-            return null;
-        }
-
-        console.log('📡 Scanning Wi-Fi networks for triangulation...');
-        let networks;
-        try {
-            networks = await Promise.race([
-                wifi.scan(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('WiFi scan timeout')), 10000))
-            ]);
-        } catch (scanError) {
-            console.warn('⚠️ WiFi scan failed:', scanError.message);
-            return null;
-        }
-
-        // Clean up Wi-Fi data for Google
-        const wifiAccessPoints = networks
-            .filter(
-                (net) => net.bssid && net.signal_level !== undefined && net.signal_level !== null
-            ) // only valid entries
-            .map((net) => ({
-                macAddress: net.bssid,
-                signalStrength: typeof net.signal_level === 'string' ? parseInt(net.signal_level, 10) : net.signal_level,
-                channel: net.channel || undefined,
-            }))
-            .filter(ap => !isNaN(ap.signalStrength)); // Remove invalid signal strengths
-
-        console.log(`📡 Found ${wifiAccessPoints.length} valid Wi-Fi networks for triangulation`);
-
-        if (wifiAccessPoints.length === 0) {
-            console.log('⚠️ No valid Wi-Fi networks found for triangulation');
-            return null;
-        }
-
-        const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-        if (!GOOGLE_API_KEY) {
-            console.log('⚠️ Google API key not available for Wi-Fi triangulation');
-            return null;
-        }
-
-        // Prepare payload for Wi-Fi triangulation
-        const payload = {
-            considerIp: false, // Prioritize Wi-Fi over IP
-            wifiAccessPoints
-        };
-
-        console.log('🌍 Calling Google Geolocation API with Wi-Fi data...');
-        console.log('📡 Wi-Fi payload:', JSON.stringify(payload, null, 2));
-
-        const geoRes = await axios.post(
-            `https://www.googleapis.com/geolocation/v1/geolocate?key=${GOOGLE_API_KEY}`,
-            payload,
-            {
-                timeout: 10000,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-
-        const { lat, lng } = geoRes.data.location;
-        const accuracy = geoRes.data.accuracy;
-
-        console.log(`📍 Wi-Fi triangulation successful: ${lat}, ${lng} (accuracy: ${accuracy}m)`);
-
-        return { lat, lng, accuracy, method: 'wifi' };
-    } catch (error) {
-        console.error('❌ Wi-Fi triangulation failed:', error.response?.data || error.message);
-        return null;
-    }
-}
+async function getWiFiLocation() { return null }
 
 // GPS fallback location detection function
 async function getGPSLocation() {
@@ -2125,7 +2041,7 @@ app.get('/api/region-production', authenticateToken, async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-    res.redirect('http://localhost:5173');
+    res.send('FarmFlow API is running. Connect via the frontend application.');
 });
 
 // Get region production data by coordinates (for map click functionality)

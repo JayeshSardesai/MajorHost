@@ -141,10 +141,7 @@ const transporter = nodemailer.createTransport({
         pass: process.env.EMAIL_PASS
     },
     // Added these options to potentially help with connection timeouts
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100,
-    rateLimit: 5
+    pool: true
 });
 
 // Generate OTP

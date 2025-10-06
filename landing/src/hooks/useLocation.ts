@@ -1,10 +1,8 @@
-// In landing/src/hooks/useLocation.ts
-
 import { useState, useEffect } from 'react';
 import axios, { AxiosError } from 'axios';
 
-// Define a type for your location data for better type safety
-interface LocationData {
+// Add the 'export' keyword here so other files can import this type
+export interface LocationData {
     success: boolean;
     coordinates: {
         lat: number;
@@ -15,13 +13,13 @@ interface LocationData {
         state: string;
         district: string;
     };
-    mapUrl: string;
+    mapUrl: string | null;
     method: string;
     locationSource: string;
 }
 
-const useLocation = () => {
-    // Explicitly type the state variables
+// Change from 'const useLocation =' to 'export const useLocation ='
+export const useLocation = () => {
     const [locationData, setLocationData] = useState<LocationData | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -42,18 +40,12 @@ const useLocation = () => {
 
                         const response = await axios.post<LocationData>(
                             `${import.meta.env.VITE_API_URL}/api/location`,
-                            {
-                                latitude: latitude,
-                                longitude: longitude,
-                            },
-                            {
-                                headers: { Authorization: `Bearer ${token}` },
-                            }
+                            { latitude, longitude },
+                            { headers: { Authorization: `Bearer ${token}` } }
                         );
 
                         setLocationData(response.data);
                     } catch (apiError) {
-                        // Handle potential Axios errors to get a useful message
                         if (axios.isAxiosError(apiError)) {
                             const axiosError = apiError as AxiosError<{ error?: string }>;
                             const serverError = axiosError.response?.data?.error || 'An unknown server error occurred.';
@@ -67,7 +59,6 @@ const useLocation = () => {
                     }
                 },
                 (geoError) => {
-                    // The geoError.message is a string, which now matches our state type
                     setError(geoError.message || 'Could not get device location.');
                     setLoading(false);
                 }
@@ -79,5 +70,3 @@ const useLocation = () => {
 
     return { locationData, error, loading };
 };
-
-export default useLocation;

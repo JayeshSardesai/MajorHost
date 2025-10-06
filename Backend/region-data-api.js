@@ -29,7 +29,7 @@ const getRegionData = async (req, res) => {
         console.log('🔍 BYPASSING geocoding - using coordinate-based district detection...');
         const latNum = parseFloat(lat);
         const lngNum = parseFloat(lng);
-        
+
         // Karnataka coordinate ranges for major districts
         const districtCoordinates = {
             'bangalore rural': { lat: 12.9716, lng: 77.5946, range: 0.5 },
@@ -43,21 +43,21 @@ const getRegionData = async (req, res) => {
             'belgaum': { lat: 15.8497, lng: 74.4977, range: 0.4 },
             'bagalkot': { lat: 16.1781, lng: 75.6961, range: 0.3 }
         };
-        
+
         let closestDistrict = 'bangalore rural'; // Default fallback
         let minDistance = Infinity;
-        
+
         for (const [district, coords] of Object.entries(districtCoordinates)) {
             const distance = Math.sqrt(
                 Math.pow(latNum - coords.lat, 2) + Math.pow(lngNum - coords.lng, 2)
             );
-            
+
             if (distance < minDistance) {
                 minDistance = distance;
                 closestDistrict = district;
             }
         }
-        
+
         clickedDistrict = closestDistrict;
         clickedState = 'Karnataka';
         console.log(`🎯 Coordinate-based detection: ${clickedDistrict} (distance: ${minDistance.toFixed(4)})`);
@@ -94,7 +94,7 @@ const getRegionData = async (req, res) => {
         // Load processed_cycles.json for threshold data - EXACT SAME LOGIC AS SERVER.JS
         let thresholdData = null;
         try {
-            const processedCyclesPath = path.join(__dirname, '../landing/processed_cycles.json');
+            const processedCyclesPath = path.join(__dirname, 'processed_cycles.json');
             console.log('🔍 Looking for processed_cycles.json at:', processedCyclesPath);
 
             if (fs.existsSync(processedCyclesPath)) {

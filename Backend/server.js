@@ -100,7 +100,12 @@ const RegionProduction = mongoose.model('RegionProduction', new mongoose.Schema(
 }, { indexes: [{ cropLower: 1, stateLower: 1, districtLower: 1, seasonLower: 1 }] }));
 
 // Middleware
-app.use(cors());
+const corsOptions = {
+    origin: 'https://majorfarmflow.netlify.app',
+    credentials: true,
+    optionsSuccessStatus: 200 // For legacy browser support
+};
+app.use(cors(corsOptions));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(session({
@@ -620,7 +625,7 @@ app.post('/api/location', async (req, res) => {
     try {
         const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
         const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
-
+        const GEOCODING_API_KEY = process.env.GEOCODING_API_KEY;
         if (!GOOGLE_API_KEY) {
             return res.status(500).json({
                 error: 'GOOGLE_API_KEY not configured',
@@ -1463,7 +1468,7 @@ app.get('/api/crop-details/:cropName', authenticateToken, async (req, res) => {
 
                     // Fallback: Try to get fresh location using Google API
                     const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-                    const GEOCODING_API_KEY = process.env.GOOGLE_API_KEY; // Use same key for geocoding
+                    const GEOCODING_API_KEY = process.env.GEOCODING_API_KEY; // Use same key for geocoding
 
                     if (GOOGLE_API_KEY) {
                         try {

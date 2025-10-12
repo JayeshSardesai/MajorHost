@@ -948,11 +948,7 @@ const Dashboard = () => {
               </div>
               <i data-lucide="arrow-right" className="h-4 w-4 text-muted-400"></i>
             </div>
-            <OptimizedMap
-              predictions={predictions}
-              showCropInfo={true}
-              coordinates={weatherData.coordinates}
-            />
+            <OptimizedMap predictions={predictions} showCropInfo={true} coordinates={weatherData.coordinates} />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 mb-8">

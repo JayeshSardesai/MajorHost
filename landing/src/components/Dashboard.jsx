@@ -47,6 +47,7 @@ const Dashboard = () => {
   const [weatherData, setWeatherData] = useState({
     district: 'Loading...',
     state: 'Loading...',
+    coordinates: null, // Add this line
     current: { temp: '--', humidity: '--', condition: 'Loading...' },
     forecast: [
       { day: 'Today', temp: '--', humidity: '--', condition: 'Loading...' },
@@ -140,6 +141,7 @@ const Dashboard = () => {
               ...prev,
               district: address?.district || prev.district,
               state: address?.state || prev.state,
+              coordinates: { lat, lng }, // Add this line
             }));
             // Enhanced location loaded - OptimizedMap will handle coordinates
             setWeatherLoaded(true);
@@ -946,7 +948,11 @@ const Dashboard = () => {
               </div>
               <i data-lucide="arrow-right" className="h-4 w-4 text-muted-400"></i>
             </div>
-            <OptimizedMap predictions={predictions} showCropInfo={true} />
+            <OptimizedMap
+              predictions={predictions}
+              showCropInfo={true}
+              coordinates={weatherData.coordinates}
+            />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 mb-8">

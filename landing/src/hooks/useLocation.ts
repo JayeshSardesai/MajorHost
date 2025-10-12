@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import axios, { AxiosError } from 'axios';
 
-// Add the 'export' keyword here so other files can import this type
+// This interface should be exported if other files need it
 export interface LocationData {
     success: boolean;
     coordinates: {
@@ -18,7 +17,6 @@ export interface LocationData {
     locationSource: string;
 }
 
-// Change from 'const useLocation =' to 'export const useLocation ='
 export const useLocation = () => {
     const [locationData, setLocationData] = useState<LocationData | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -38,21 +36,30 @@ export const useLocation = () => {
                         const { latitude, longitude } = position.coords;
                         const token = localStorage.getItem('token');
 
-                        const response = await axios.post<LocationData>(
+                        // Using fetch to match the project's style
+                        const response = await fetch(
                             `${import.meta.env.VITE_API_URL}/api/location`,
-                            { latitude, longitude },
-                            { headers: { Authorization: `Bearer ${token}` } }
+                            {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({ latitude, longitude })
+                            }
                         );
 
-                        setLocationData(response.data);
-                    } catch (apiError) {
-                        if (axios.isAxiosError(apiError)) {
-                            const axiosError = apiError as AxiosError<{ error?: string }>;
-                            const serverError = axiosError.response?.data?.error || 'An unknown server error occurred.';
-                            setError(serverError);
-                        } else {
-                            setError('Could not fetch location details from the server.');
+                        if (!response.ok) {
+                            // Try to get a specific error message from the backend
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
                         }
+
+                        const data: LocationData = await response.json();
+                        setLocationData(data);
+
+                    } catch (apiError: any) {
+                        setError(apiError.message || 'Could not fetch location details from the server.');
                         console.error('API Error:', apiError);
                     } finally {
                         setLoading(false);

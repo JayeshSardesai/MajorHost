@@ -1,10 +1,96 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-// This component is now a simple, reliable static map viewer.
-const OptimizedMap = ({ coordinates }) => {
+// This component now renders a fully interactive Google Map.
+const OptimizedMap = ({ coordinates, predictions = [] }) => {
+  const mapRef = useRef(null); // Reference to the div where the map will be rendered
+  const [map, setMap] = useState(null); // State to hold the map instance
+  const [marker, setMarker] = useState(null); // State to hold the marker instance
+  const [infoWindow, setInfoWindow] = useState(null); // State for the popup window
 
-  // 1. If the Dashboard is still fetching the location, show a loading state.
-  if (!coordinates || !coordinates.lat || !coordinates.lng) {
+  // Effect to load the Google Maps script
+  useEffect(() => {
+    const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.error("Error: Google Maps API Key is missing.");
+      return;
+    }
+    if (window.google && window.google.maps) return; // Already loaded
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
+    script.async = true;
+    document.head.appendChild(script);
+  }, []);
+
+  // Effect to initialize and update the map
+  useEffect(() => {
+    // Wait until the script is loaded and we have coordinates from the Dashboard
+    if (window.google && window.google.maps && coordinates) {
+
+      const center = { lat: coordinates.lat, lng: coordinates.lng };
+
+      // Create the map instance if it doesn't exist yet
+      if (!map && mapRef.current) {
+        const newMap = new window.google.maps.Map(mapRef.current, {
+          center: center,
+          zoom: 12,
+          mapTypeControl: false,
+          streetViewControl: false,
+          gestureHandling: 'cooperative' // Allows zooming and panning
+        });
+        setMap(newMap);
+
+        const newMarker = new window.google.maps.Marker({
+          position: center,
+          map: newMap,
+          title: "Your Location"
+        });
+        setMarker(newMarker);
+
+        const newInfoWindow = new window.google.maps.InfoWindow();
+        setInfoWindow(newInfoWindow);
+
+        console.log('✅ Dashboard: Interactive map created.');
+      }
+      // If the map and marker already exist, just update their positions
+      else if (map) {
+        map.panTo(center);
+        if (marker) {
+          marker.setPosition(center);
+        }
+      }
+    }
+  }, [coordinates, map, marker]);
+
+  // Effect to handle the popup window for crop predictions
+  useEffect(() => {
+    if (map && marker && infoWindow && predictions.length > 0) {
+      const popupContent = `
+         <div style="font-family: Inter, sans-serif; padding: 4px; max-width: 250px;">
+           <div style="font-weight: 600; font-size: 14px; color: #065f46; margin-bottom: 8px;">Top Crop Suggestions</div>
+           ${predictions.slice(0, 5).map(p => `
+             <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+               <span>${p.crop}</span>
+               <span style="font-weight: 500; color: #10b981;">${p.probability}%</span>
+             </div>
+           `).join('')}
+         </div>`;
+
+      infoWindow.setContent(popupContent);
+
+      // Clear previous listeners to avoid memory leaks
+      window.google.maps.event.clearInstanceListeners(marker);
+
+      // Add a click listener to the marker to open the popup
+      marker.addListener('click', () => {
+        infoWindow.open(map, marker);
+      });
+    }
+  }, [map, marker, infoWindow, predictions]);
+
+
+  // Show a loading state while waiting for coordinates from the Dashboard
+  if (!coordinates) {
     return (
       <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
         <div className="text-center">
@@ -15,35 +101,13 @@ const OptimizedMap = ({ coordinates }) => {
     );
   }
 
-  // 2. Get the API Key from your environment variables.
-  const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-  if (!GOOGLE_MAPS_API_KEY) {
-    return <p className="text-red-500 p-4">Error: Google Maps API Key is missing.</p>;
-  }
-
-  // 3. Build the static map URL, exactly like in CropDetails.jsx.
-  const { lat, lng } = coordinates;
-  const base = 'https://maps.googleapis.com/maps/api/staticmap';
-  const center = `${lat},${lng}`;
-  const zoom = 12;
-  const size = '600x300'; // Using a standard size for the map image
-  const marker = `markers=color:blue%7Clabel:U%7C${center}`; // "U" for "You"
-
-  const mapUrl = `${base}?center=${center}&zoom=${zoom}&size=${size}&maptype=roadmap&${marker}&key=${GOOGLE_MAPS_API_KEY}`;
-
-  console.log('✅ OptimizedMap received coordinates. Rendering static map.');
-
-  // 4. Render the map image.
+  // Render the div that the Google Map will attach to. This is where the magic happens.
   return (
-    <div className="w-full h-64 rounded-lg overflow-hidden border border-soft-beige-200 bg-gray-100">
-      <img
-        src={mapUrl}
-        alt="Map showing your current location"
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
-    </div>
+    <div
+      ref={mapRef}
+      className="w-full h-64 rounded-lg border border-soft-beige-200"
+      aria-label="Interactive map showing your current location"
+    />
   );
 };
 

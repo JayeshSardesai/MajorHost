@@ -113,54 +113,61 @@ const Dashboard = () => {
   useEffect(() => {
     checkAuthentication();
 
-    // Try to load cached data first
-    const hasCachedData = loadCachedLocationData();
+    const fetchLocationAndWeather = async () => {
+      try {
+        // First, try to load any valid cached location from localStorage
+        const cachedLocation = localStorage.getItem('locationData');
+        if (cachedLocation) {
+          const locationData = JSON.parse(cachedLocation);
+          const cacheAge = new Date() - new Date(locationData.timestamp);
+          const maxAge = 60 * 60 * 1000; // 1 hour
 
-    // Only fetch fresh data if no valid cache exists
-    if (!hasCachedData) {
-      (async () => {
-        try {
-          console.log('🌐 Using enhanced location service for Dashboard...');
-          const locationData = await locationService.getCurrentLocationWithTimeout(15000);
-
-          if (locationData && locationData.lat && locationData.lng) {
-            const { lat, lng, address, mapUrl, locationSource } = locationData;
-
-            console.log(`🗺️ Dashboard location via ${locationSource}: ${address?.district}, ${address?.state}`);
-
-            // Cache the location data
-            localStorage.setItem('locationData', JSON.stringify({
-              coordinates: { lat, lng },
-              address,
-              mapUrl,
-              locationSource,
-              timestamp: new Date().toISOString()
-            }));
-
+          if (cacheAge < maxAge) {
+            console.log('✅ Using valid cached location data for map.');
+            // THIS IS THE CRITICAL STATE UPDATE
             setWeatherData(prev => ({
               ...prev,
-              district: address?.district || prev.district,
-              state: address?.state || prev.state,
-              coordinates: { lat, lng }, // Add this line
+              district: locationData.address?.district || prev.district,
+              state: locationData.address?.state || prev.state,
+              coordinates: locationData.coordinates // Set coordinates from cache
             }));
-            // Enhanced location loaded - OptimizedMap will handle coordinates
             setWeatherLoaded(true);
-          } else {
-            console.warn('Enhanced location service failed, using fallback');
-            handleLocationFallback();
+            return; // Exit if we have a valid cache
           }
-        } catch (e) {
-          console.warn('Enhanced location service failed', e);
-          handleLocationFallback();
         }
-      })();
-    }
 
-    return () => {
-      // No-op cleanup to prevent state updates after unmount on back nav
+        // If no valid cache, fetch fresh location data
+        console.log('🌐 No valid cache, fetching fresh location...');
+        const locationData = await locationService.getCurrentLocationWithTimeout(15000);
+
+        if (locationData && locationData.coordinates) {
+          const { coordinates, address } = locationData;
+          console.log(`🗺️ Dashboard location fetched: ${address?.district}, ${address?.state}`);
+
+          // Store the fresh data in localStorage
+          localStorage.setItem('locationData', JSON.stringify({
+            ...locationData,
+            timestamp: new Date().toISOString()
+          }));
+
+          // THIS IS THE SECOND CRITICAL STATE UPDATE
+          setWeatherData(prev => ({
+            ...prev,
+            district: address?.district || prev.district,
+            state: address?.state || prev.state,
+            coordinates: coordinates // Set coordinates from fresh fetch
+          }));
+          setWeatherLoaded(true);
+        }
+      } catch (e) {
+        console.error('Enhanced location service failed in Dashboard:', e);
+        // You could implement a fallback here if needed
+      }
     };
-  }, []);
 
+    fetchLocationAndWeather();
+
+  }, []);
   const handleLocationFallback = async () => {
     try {
       console.log('🔄 Using enhanced location service fallback...');

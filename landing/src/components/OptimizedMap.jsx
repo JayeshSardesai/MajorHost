@@ -1,10 +1,7 @@
 import React from 'react';
 
-// This component now correctly accepts 'coordinates' as a prop from the Dashboard.
 const OptimizedMap = ({ coordinates }) => {
-
-  // If the Dashboard has not passed the coordinates yet, display a loading state.
-  // This is why you are seeing "waiting for location...".
+  // If the Dashboard has not passed the coordinates yet, display the loading state.
   if (!coordinates || !coordinates.lat || !coordinates.lng) {
     return (
       <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -22,7 +19,7 @@ const OptimizedMap = ({ coordinates }) => {
     return <p className="text-red-500">Error: Google Maps API Key is missing.</p>;
   }
 
-  // Once coordinates are received, build the map URL and display the image.
+  // Once coordinates are received, build and display the map.
   const { lat, lng } = coordinates;
   const center = `${lat},${lng}`;
   const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=12&size=600x300&maptype=roadmap&markers=color:blue%7Clabel:U%7C${center}&key=${GOOGLE_MAPS_API_KEY}`;

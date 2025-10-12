@@ -48,70 +48,74 @@ const SelectCrop = () => {
 
         // Load user's existing crops to check limits
         try {
-          const cropsResp = await fetch(`${apiUrl}/api/user-crops`, {
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${apiUrl}/api/user-crops`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              crop: crop.name,
+              areaHectare: crop.area,
+              season: crop.season,
+              // Add the user's location data to the request
+              district: locationData.district,
+              state: locationData.state,
+            }),
           });
-          if (cropsResp.ok) {
-            const cropsData = await cropsResp.json();
-            setUserCrops(cropsData.crops || []);
-            setCropLimits({ current: cropsData.crops?.length || 0, max: 5 });
-            console.log('📊 User crops loaded:', cropsData.crops?.length || 0, 'out of 5');
-          }
-        } catch (cropsError) {
-          console.warn('Failed to load user crops:', cropsError);
-        }
 
-        // Load location data from weather API
-        try {
-          const locationResp = await fetch(`${apiUrl}/api/location`);
-          const locationData = await locationResp.json();
-          if (locationData?.success && locationData.address) {
-            const locationInfo = {
-              state: locationData.address.state || '',
-              district: locationData.address.district || ''
-            };
-            setLocationData(locationInfo);
-            console.log('📍 Location data loaded for crop selection:', locationInfo);
-          } else {
-            console.warn('⚠️ No location data available from API');
-          }
-        } catch (locError) {
-          console.warn('Failed to load location data:', locError);
-        }
-
-        // Load available crops from cached predictions
-        const cachedPredictions = localStorage.getItem('cropPredictions');
-        if (cachedPredictions) {
+          // Load location data from weather API
           try {
-            const data = JSON.parse(cachedPredictions);
-            if (data.predictions && Array.isArray(data.predictions)) {
-              // Extract crop names from predictions and sort by probability
-              const crops = data.predictions
-                .sort((a, b) => b.probability - a.probability)
-                .map(p => p.crop)
-                .filter(Boolean);
-              setAvailableCrops(crops);
+            const locationResp = await fetch(`${apiUrl}/api/location`);
+            const locationData = await locationResp.json();
+            if (locationData?.success && locationData.address) {
+              const locationInfo = {
+                state: locationData.address.state || '',
+                district: locationData.address.district || ''
+              };
+              setLocationData(locationInfo);
+              console.log('📍 Location data loaded for crop selection:', locationInfo);
+            } else {
+              console.warn('⚠️ No location data available from API');
             }
-          } catch (parseError) {
-            console.error('Failed to parse cached predictions:', parseError);
-            // Fallback to default crops if parsing fails
+          } catch (locError) {
+            console.warn('Failed to load location data:', locError);
+          }
+
+          // Load available crops from cached predictions
+          const cachedPredictions = localStorage.getItem('cropPredictions');
+          if (cachedPredictions) {
+            try {
+              const data = JSON.parse(cachedPredictions);
+              if (data.predictions && Array.isArray(data.predictions)) {
+                // Extract crop names from predictions and sort by probability
+                const crops = data.predictions
+                  .sort((a, b) => b.probability - a.probability)
+                  .map(p => p.crop)
+                  .filter(Boolean);
+                setAvailableCrops(crops);
+              }
+            } catch (parseError) {
+              console.error('Failed to parse cached predictions:', parseError);
+              // Fallback to default crops if parsing fails
+              setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
+            }
+          } else {
+            // No cached predictions, use default crops
             setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
           }
-        } else {
-          // No cached predictions, use default crops
+        } catch (e) {
+          console.error('Failed to load data:', e);
+          // Fallback to default crops on error
           setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
+        } finally {
+          setLoading(false);
         }
-      } catch (e) {
-        console.error('Failed to load data:', e);
-        // Fallback to default crops on error
-        setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
 
-    loadData();
-  }, [navigate]);
+      loadData();
+    }, [navigate]);
 
   const handleSave = async () => {
     if (!crop || !areaHectare) {

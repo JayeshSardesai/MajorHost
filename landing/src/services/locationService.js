@@ -119,11 +119,14 @@ class LocationService {
                 reject(new Error('Geolocation timeout'));
             }, timeout);
 
+            // #### THE FIX: Use an arrow function here ####
+            // This ensures `this` refers to the `locationService` object
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
                     clearTimeout(timer);
                     const { latitude, longitude } = position.coords;
                     try {
+                        // Now `this.reverseGeocode` will be found correctly
                         const address = await this.reverseGeocode({ lat: latitude, lng: longitude });
                         resolve({
                             coordinates: { lat: latitude, lng: longitude },

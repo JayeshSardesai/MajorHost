@@ -4,6 +4,7 @@ import T from './T';
 import Navbar from './Navbar';
 import { useTranslation } from 'react-i18next';
 import { getCropLabelFromName } from '../constants/crops';
+import locationService from '../services/locationService';
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const SelectCrop = () => {
@@ -36,86 +37,77 @@ const SelectCrop = () => {
 
     const loadData = async () => {
       try {
-        // Load user profile
-        const resp = await fetch(`${apiUrl}/api/profile`, {
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          setCrop(data.profile?.crop ?? '');
-          setAreaHectare(data.profile?.areaHectare ?? '');
+        setLoading(true);
+        const token = localStorage.getItem('token');
+
+        // #### CHANGE 2: Use the location service for high-accuracy location ####
+        // This replaces the incorrect fetch('/api/location')
+        try {
+          const location = await locationService.getCurrentLocationWithTimeout();
+          if (location && location.address) {
+            const locationInfo = {
+              state: location.address.state || '',
+              district: location.address.district || ''
+            };
+            setLocationData(locationInfo);
+            console.log('📍 High-accuracy location loaded for crop selection:', locationInfo);
+          } else {
+            console.warn('⚠️ No location data available from location service.');
+            setError('Could not determine your location. Please enable location services in your browser.');
+          }
+        } catch (locError) {
+          console.error('Failed to load location data:', locError);
+          setError('Failed to get location. Please ensure location services are enabled and try again.');
         }
 
         // Load user's existing crops to check limits
         try {
-          const token = localStorage.getItem('token');
           const response = await fetch(`${apiUrl}/api/user-crops`, {
-            method: 'POST',
+            method: 'GET', // Use GET to fetch data, not POST
             headers: {
-              'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              crop: crop.name,
-              areaHectare: crop.area,
-              season: crop.season,
-              // Add the user's location data to the request
-              district: locationData.district,
-              state: locationData.state,
-            }),
+            }
           });
-
-          // Load location data from weather API
-          try {
-            const locationResp = await fetch(`${apiUrl}/api/location`);
-            const locationData = await locationResp.json();
-            if (locationData?.success && locationData.address) {
-              const locationInfo = {
-                state: locationData.address.state || '',
-                district: locationData.address.district || ''
-              };
-              setLocationData(locationInfo);
-              console.log('📍 Location data loaded for crop selection:', locationInfo);
-            } else {
-              console.warn('⚠️ No location data available from API');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.crops) {
+              setUserCrops(data.crops);
+              setCropLimits({ current: data.crops.length, max: 5 });
             }
-          } catch (locError) {
-            console.warn('Failed to load location data:', locError);
           }
+        } catch (err) {
+          console.error("Failed to fetch user crops", err);
+        }
 
-          // Load available crops from cached predictions
-          const cachedPredictions = localStorage.getItem('cropPredictions');
-          if (cachedPredictions) {
-            try {
-              const data = JSON.parse(cachedPredictions);
-              if (data.predictions && Array.isArray(data.predictions)) {
-                // Extract crop names from predictions and sort by probability
-                const crops = data.predictions
-                  .sort((a, b) => b.probability - a.probability)
-                  .map(p => p.crop)
-                  .filter(Boolean);
-                setAvailableCrops(crops);
-              }
-            } catch (parseError) {
-              console.error('Failed to parse cached predictions:', parseError);
-              // Fallback to default crops if parsing fails
-              setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
+        // Load available crops from cached predictions
+        const cachedPredictions = localStorage.getItem('cropPredictions');
+        if (cachedPredictions) {
+          try {
+            const data = JSON.parse(cachedPredictions);
+            if (data.predictions && Array.isArray(data.predictions)) {
+              const crops = data.predictions
+                .sort((a, b) => b.probability - a.probability)
+                .map(p => p.crop)
+                .filter(Boolean);
+              setAvailableCrops(crops);
             }
-          } else {
-            // No cached predictions, use default crops
+          } catch (parseError) {
+            console.error('Failed to parse cached predictions:', parseError);
             setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
           }
-        } catch (e) {
-          console.error('Failed to load data:', e);
-          // Fallback to default crops on error
+        } else {
           setAvailableCrops(['cowpea', 'tomato', 'onion', 'cabbage', 'bhendi', 'brinjal', 'bottle gourd', 'bitter gourd', 'cucumber', 'cluster bean', 'peas', 'french bean', 'carrot', 'radish', 'cauliflower', 'small onion', 'sweet potato']);
-        } finally {
-          setLoading(false);
         }
-      };
+      } catch (e) {
+        console.error('Failed to load data:', e);
+        setError('Failed to load necessary data.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      loadData();
-    }, [navigate]);
+    loadData();
+  }, [navigate]);
 
   const handleSave = async () => {
     if (!crop || !areaHectare) {
@@ -130,30 +122,15 @@ const SelectCrop = () => {
       return;
     }
 
+    if (!locationData.district || !locationData.state) {
+      alert('Could not determine your location. Please ensure location services are enabled and try again.');
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
 
-      // Get location data first using Google API
-      const locationResponse = await fetch(`${apiUrl}/api/location`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let locationData = {};
-      if (locationResponse.ok) {
-        const locData = await locationResponse.json();
-        if (locData.success && locData.coordinates) {
-          locationData = {
-            coordinates: locData.coordinates,
-            address: locData.address,
-            district: locData.address?.district || '',
-            state: locData.address?.state || ''
-          };
-          console.log('📍 Google API location data for crop selection:', locationData);
-        }
-      }
+      // We removed the redundant and incorrect fetch to /api/location from here.
 
       const response = await fetch(`${apiUrl}/api/production-estimation`, {
         method: 'POST',
@@ -164,8 +141,14 @@ const SelectCrop = () => {
         body: JSON.stringify({
           crop: crop,
           area: parseFloat(areaHectare),
-          areaHectare: parseFloat(areaHectare), // Backend expects this field
-          location: locationData, // Send Google API location data
+          areaHectare: parseFloat(areaHectare),
+          // Send the accurate location data from the state
+          location: {
+            address: {
+              district: locationData.district,
+              state: locationData.state,
+            }
+          },
           district: locationData.district,
           state: locationData.state
         })
@@ -175,7 +158,6 @@ const SelectCrop = () => {
         const data = await response.json();
         console.log('✅ Crop saved successfully with location:', data);
 
-        // Set a flag to indicate fresh crop was added
         localStorage.setItem('freshCropAdded', 'true');
         localStorage.setItem('lastCropAdded', JSON.stringify({
           crop: crop,
@@ -183,13 +165,10 @@ const SelectCrop = () => {
           timestamp: new Date().toISOString()
         }));
 
-        // Navigate back to dashboard without clearing cache
         navigate('/dashboard');
       } else {
         const errorData = await response.json();
         console.error('❌ Failed to save crop:', errorData);
-
-        // Handle specific error types
         if (errorData.error === 'Area limit exceeded') {
           alert(`⚠️ ${errorData.error}\n\n${errorData.details}\n\nYou entered: ${errorData.providedArea} hectares\nMaximum allowed: ${errorData.maxArea} hectares`);
         } else if (errorData.error === 'Crop limit exceeded') {

@@ -109,11 +109,37 @@ class LocationService {
         return null;
     }
 
-    async getCurrentLocationWithTimeout(timeoutMs = 20000) {
-        return Promise.race([
-            this.getCurrentLocation(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Location detection timed out.')), timeoutMs))
-        ]);
+    async getCurrentLocationWithTimeout(timeout = 10000) {
+        return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+                return reject(new Error('Geolocation is not supported by your browser.'));
+            }
+
+            const timer = setTimeout(() => {
+                reject(new Error('Geolocation timeout'));
+            }, timeout);
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    clearTimeout(timer);
+                    const { latitude, longitude } = position.coords;
+                    try {
+                        const address = await this.reverseGeocode({ lat: latitude, lng: longitude });
+                        resolve({
+                            coordinates: { lat: latitude, lng: longitude },
+                            address: address,
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                },
+                (error) => {
+                    clearTimeout(timer);
+                    reject(error);
+                },
+                { enableHighAccuracy: true, timeout, maximumAge: 0 }
+            );
+        });
     }
 
     async refreshLocation() {

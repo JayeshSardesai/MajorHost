@@ -6,6 +6,7 @@ const OptimizedMap = ({ coordinates, predictions = [] }) => {
   const [map, setMap] = useState(null); // State to hold the map instance
   const [marker, setMarker] = useState(null); // State to hold the marker instance
   const [infoWindow, setInfoWindow] = useState(null); // State for the popup window
+  const [isScriptLoaded, setIsScriptLoaded] = useState(false); // State to track script loading
 
   // Effect to load the Google Maps script
   useEffect(() => {
@@ -14,18 +15,28 @@ const OptimizedMap = ({ coordinates, predictions = [] }) => {
       console.error("Error: Google Maps API Key is missing.");
       return;
     }
-    if (window.google && window.google.maps) return; // Already loaded
+
+    if (window.google && window.google.maps) {
+      setIsScriptLoaded(true);
+      return;
+    }
 
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
     script.async = true;
+    script.onload = () => {
+      setIsScriptLoaded(true);
+    };
+    script.onerror = () => {
+      console.error("Error: Failed to load Google Maps script.");
+    }
     document.head.appendChild(script);
   }, []);
 
   // Effect to initialize and update the map
   useEffect(() => {
     // Wait until the script is loaded and we have coordinates from the Dashboard
-    if (window.google && window.google.maps && coordinates) {
+    if (isScriptLoaded && coordinates) {
 
       const center = { lat: coordinates.lat, lng: coordinates.lng };
 
@@ -60,7 +71,7 @@ const OptimizedMap = ({ coordinates, predictions = [] }) => {
         }
       }
     }
-  }, [coordinates, map, marker]);
+  }, [isScriptLoaded, coordinates, map, marker]);
 
   // Effect to handle the popup window for crop predictions
   useEffect(() => {

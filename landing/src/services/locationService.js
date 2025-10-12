@@ -1,9 +1,9 @@
 /**
- * Pure Geolocation Service
- * This service reliably gets the user's location using the browser's standard
- * Geolocation API and communicates with the backend to get address details.
+ * Unified Geolocation Service
+ * This service reliably gets the user's location using the browser's Geolocation
+ * API and uses a public service to get address details (reverse geocoding).
+ * It includes a 5-minute cache to prevent excessive API calls.
  */
-
 class LocationService {
     constructor() {
         this.cache = {
@@ -14,7 +14,8 @@ class LocationService {
     }
 
     /**
-     * Main method to get the user's current location.
+     * Main method to get the user's current location and address.
+     * It checks the cache first before fetching fresh data.
      */
     async getCurrentLocation() {
         const cachedLocation = this.getCachedLocation();
@@ -24,14 +25,24 @@ class LocationService {
         }
 
         console.log('🛰️ Requesting fresh user location from browser...');
+        // 1. Get high-accuracy coordinates from the browser.
         const coords = await this.getBrowserCoordinates();
-        const locationData = await this.getLocationDetailsFromBackend(coords.lat, coords.lng);
+        // 2. Convert coordinates to a readable address.
+        const address = await this.reverseGeocode(coords);
+
+        const locationData = {
+            success: true,
+            coordinates: { lat: coords.lat, lng: coords.lng },
+            address: address
+        };
+
+        // 3. Cache the final result.
         this.cacheLocation(locationData);
         return locationData;
     }
 
     /**
-     * Gets high-accuracy coordinates using the browser's Geolocation API.
+     * Gets coordinates using the browser's Geolocation API via a Promise.
      */
     getBrowserCoordinates() {
         return new Promise((resolve, reject) => {
@@ -41,66 +52,68 @@ class LocationService {
 
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    const { latitude, longitude, accuracy } = position.coords;
+                    const { latitude, longitude } = position.coords;
                     console.log(`✅ Browser geolocation successful: ${latitude}, ${longitude}`);
-                    resolve({ lat: latitude, lng: longitude, accuracy });
+                    resolve({ lat: latitude, lng: longitude });
                 },
                 (error) => {
                     console.error('❌ Browser geolocation failed:', error.message);
                     reject(new Error(`Could not get device location: ${error.message}`));
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 15000,
-                    maximumAge: 0
-                }
+                }, {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            }
             );
         });
     }
 
     /**
-     * Sends coordinates to the backend to get address details.
+     * Converts coordinates {lat, lng} into a human-readable address.
+     * This function was missing, which caused the crash.
      */
-    async getLocationDetailsFromBackend(latitude, longitude) {
+    async reverseGeocode({ lat, lng }) {
         try {
-            const token = localStorage.getItem('token');
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-            const response = await fetch(`${apiUrl}/api/location`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token || ''}`
-                },
-                body: JSON.stringify({ latitude, longitude })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Backend API failed: ${response.status}`);
-            }
+            // Using a free, reliable reverse geocoding service.
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
             const data = await response.json();
-            console.log(`✅ Backend processed location: ${data.address.district}, ${data.address.state}`);
-            return data;
+
+            if (data && data.address) {
+                const address = {
+                    district: data.address.county || data.address.city_district || data.address.city || '',
+                    state: data.address.state || '',
+                    country: data.address.country || '',
+                };
+                console.log(`✅ Reverse geocoding successful: ${address.district}, ${address.state}`);
+                return address;
+            }
+            throw new Error('Could not parse address from geocoding response.');
         } catch (error) {
-            console.error('❌ Failed to get location details from backend:', error.message);
-            throw error;
+            console.error('❌ Reverse geocoding failed:', error);
+            throw new Error('Failed to convert coordinates to address.');
         }
     }
 
+    /**
+     * Caches the location data to localStorage and memory.
+     */
     cacheLocation(locationData) {
+        const timestamp = Date.now();
         this.cache.location = locationData;
-        this.cache.timestamp = Date.now();
-        localStorage.setItem('locationCache', JSON.stringify({ data: locationData, timestamp: Date.now() }));
+        this.cache.timestamp = timestamp;
+        localStorage.setItem('locationCache', JSON.stringify({ data: locationData, timestamp }));
     }
 
+    /**
+     * Retrieves valid location data from the cache if it's not expired.
+     */
     getCachedLocation() {
         try {
             const cached = localStorage.getItem('locationCache');
             if (!cached) return null;
+
             const { data, timestamp } = JSON.parse(cached);
             if (Date.now() - timestamp < this.cache.maxAge) {
-                this.cache.location = data;
-                this.cache.timestamp = timestamp;
                 return data;
             }
         } catch (e) {
@@ -108,49 +121,8 @@ class LocationService {
         }
         return null;
     }
-
-    async getCurrentLocationWithTimeout(timeout = 10000) {
-        return new Promise((resolve, reject) => {
-            if (!navigator.geolocation) {
-                return reject(new Error('Geolocation is not supported by your browser.'));
-            }
-
-            const timer = setTimeout(() => {
-                reject(new Error('Geolocation timeout'));
-            }, timeout);
-
-            // #### THE FIX: Use an arrow function here ####
-            // This ensures `this` refers to the `locationService` object
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    clearTimeout(timer);
-                    const { latitude, longitude } = position.coords;
-                    try {
-                        // Now `this.reverseGeocode` will be found correctly
-                        const address = await this.reverseGeocode({ lat: latitude, lng: longitude });
-                        resolve({
-                            coordinates: { lat: latitude, lng: longitude },
-                            address: address,
-                        });
-                    } catch (error) {
-                        reject(error);
-                    }
-                },
-                (error) => {
-                    clearTimeout(timer);
-                    reject(error);
-                },
-                { enableHighAccuracy: true, timeout, maximumAge: 0 }
-            );
-        });
-    }
-
-    async refreshLocation() {
-        this.cache.location = null;
-        localStorage.removeItem('locationCache');
-        return await this.getCurrentLocationWithTimeout();
-    }
 }
 
+// Export a single instance of the service for the whole app to use.
 const locationService = new LocationService();
 export default locationService;

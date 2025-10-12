@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useLocation } from "../hooks/useLocation";
 import T from './T';
 import { useTranslation } from 'react-i18next';
+import locationService from '../services/locationService'; // Import our corrected service
 
 const WeatherApp = () => {
   const { t, i18n } = useTranslation();
@@ -9,103 +9,79 @@ const WeatherApp = () => {
   // State for weather, forecast, errors, and loading status
   const [weather, setWeather] = useState(null);
   const [forecast, setForecast] = useState([]);
+  const [locationAddress, setLocationAddress] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // 1. We call the useLocation hook we created. It provides the location data,
-  //    its loading state, and any errors that occurred.
-  const { locationData, loading: locationLoading, error: locationError } = useLocation();
 
   // Your OpenWeatherMap API key
   const apiKey = "c76c099025fdd8cbb647172c0eba0197";
 
-  // 2. This useEffect hook is the main controller. It waits for the useLocation
-  //    hook to finish, and then decides what to do next.
   useEffect(() => {
-    // This async function fetches both current weather and the 5-day forecast
-    const fetchWeatherData = async (lat, lng) => {
-      // Reset state before fetching
+    const fetchLocationAndWeather = async () => {
       setLoading(true);
       setError(null);
-
       try {
-        // --- Fetch Current Weather ---
-        const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric&lang=${i18n.language}`;
-        const weatherResponse = await fetch(weatherUrl);
-        const currentWeatherData = await weatherResponse.json();
+        // 1. Get location data directly from our robust service
+        const locationData = await locationService.getCurrentLocation();
 
-        if (currentWeatherData.cod !== 200) {
-          throw new Error(currentWeatherData.message || 'Unable to fetch current weather');
+        if (locationData && locationData.success) {
+          const { lat, lng } = locationData.coordinates;
+          setLocationAddress(locationData.address); // Save the address for display
+
+          // --- 2. Fetch Current Weather ---
+          const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric&lang=${i18n.language}`;
+          const weatherResponse = await fetch(weatherUrl);
+          const currentWeatherData = await weatherResponse.json();
+
+          if (currentWeatherData.cod !== 200) {
+            throw new Error(currentWeatherData.message || 'Unable to fetch current weather');
+          }
+
+          setWeather({
+            temp: currentWeatherData.main.temp,
+            description: currentWeatherData.weather[0].description,
+            humidity: currentWeatherData.main.humidity,
+            icon: currentWeatherData.weather[0].icon,
+          });
+
+          // --- 3. Fetch 5-Day Forecast ---
+          const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric&lang=${i18n.language}`;
+          const forecastResponse = await fetch(forecastUrl);
+          const forecastData = await forecastResponse.json();
+
+          if (forecastData.cod !== "200") {
+            throw new Error(forecastData.message || 'Unable to fetch forecast');
+          }
+
+          // Filter the forecast to get one entry per day (at noon)
+          const dailyForecast = forecastData.list.filter((entry) =>
+            entry.dt_txt.includes("12:00:00")
+          );
+
+          setForecast(
+            dailyForecast.map((day) => ({
+              date: day.dt_txt.split(" ")[0],
+              temp: day.main.temp,
+              description: day.weather[0].description,
+              icon: day.weather[0].icon,
+            }))
+          );
+        } else {
+          throw new Error("Location data could not be retrieved.");
         }
-
-        setWeather({
-          name: currentWeatherData.name,
-          country: currentWeatherData.sys.country,
-          temp: currentWeatherData.main.temp,
-          description: currentWeatherData.weather[0].description,
-          humidity: currentWeatherData.main.humidity,
-          icon: currentWeatherData.weather[0].icon,
-        });
-
-        // --- Fetch 5-Day Forecast ---
-        const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric&lang=${i18n.language}`;
-        const forecastResponse = await fetch(forecastUrl);
-        const forecastData = await forecastResponse.json();
-
-        if (forecastData.cod !== "200") {
-          throw new Error(forecastData.message || 'Unable to fetch forecast');
-        }
-
-        // Filter the forecast list to get one entry per day (at noon)
-        const dailyForecast = forecastData.list.filter((entry) =>
-          entry.dt_txt.includes("12:00:00")
-        );
-
-        setForecast(
-          dailyForecast.map((day) => ({
-            date: day.dt_txt.split(" ")[0],
-            temp: day.main.temp,
-            description: day.weather[0].description,
-            icon: day.weather[0].icon,
-          }))
-        );
-
-      } catch (weatherErr) {
-        console.error('Weather fetch error:', weatherErr);
-        setError(t('weather.errorFetch', '⚠️ Error fetching weather data.'));
+      } catch (err) {
+        console.error('WeatherApp process error:', err);
+        setError(err.message || t('weather.errorFetch', '⚠️ Error fetching data.'));
       } finally {
-        // We are done loading, regardless of success or failure
         setLoading(false);
       }
     };
 
-    // --- Logic to decide WHEN to fetch weather ---
-
-    if (locationLoading) {
-      // If the location hook is still working, we keep showing the loading state.
-      setLoading(true);
-      return;
-    }
-
-    if (locationError) {
-      // If the location hook failed, we display the error it provided.
-      setError(locationError);
-      setLoading(false);
-      return;
-    }
-
-    if (locationData && locationData.success) {
-      // If the location hook succeeded, we get the coordinates and fetch the weather.
-      const { lat, lng } = locationData.coordinates;
-      fetchWeatherData(lat, lng);
-    }
-
-    // This effect re-runs if the location data, language, or translation function changes.
-  }, [locationData, locationLoading, locationError, i18n.language, t]);
+    fetchLocationAndWeather();
+  }, [i18n.language, t]); // Re-fetch if language changes
 
 
   // --- Rendering Logic ---
-  // This is the complete JSX structure to display the component.
 
   return (
     <div className="h-full flex flex-col">
@@ -126,11 +102,11 @@ const WeatherApp = () => {
         </div>
       )}
 
-      {!loading && !error && weather && locationData && (
+      {!loading && !error && weather && locationAddress && (
         <>
           <div className="bg-gradient-to-br from-blue-50 to-green-50 rounded-lg p-3 text-center mb-2">
             <h4 className="text-[11px] font-semibold mb-1 text-gray-800">
-              {locationData.address.district}, {locationData.address.state}
+              {locationAddress.district}, {locationAddress.state}
             </h4>
             <p className="text-base font-bold text-gray-900 mb-1">
               <img src={`https://openweathermap.org/img/wn/${weather.icon}.png`} alt={weather.description} className="inline-block w-8 h-8 -mt-2" />

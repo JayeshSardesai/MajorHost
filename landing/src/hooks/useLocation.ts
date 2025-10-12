@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
+import locationService from '../services/locationService.js'; // Import the main service
+import { LocationData } from './types'; // Assuming you have a types file, or define it here
 
-// This interface should be exported if other files need it
+// It's good practice to have shared types. If you don't have a types file,
+// you can copy the LocationData interface from the old file here.
 export interface LocationData {
     success: boolean;
     coordinates: {
@@ -17,63 +20,27 @@ export interface LocationData {
     locationSource: string;
 }
 
+
 export const useLocation = () => {
     const [locationData, setLocationData] = useState<LocationData | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
-        const fetchLocation = () => {
-            if (!navigator.geolocation) {
-                setError('Geolocation is not supported by your browser.');
+        const fetchLocation = async () => {
+            try {
+                // Now, this hook is just a simple wrapper around our robust, centralized service
+                const data = await locationService.getCurrentLocationWithTimeout();
+                setLocationData(data);
+            } catch (err: any) {
+                setError(err.message || 'An unknown error occurred while fetching location.');
+            } finally {
                 setLoading(false);
-                return;
             }
-
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    try {
-                        const { latitude, longitude } = position.coords;
-                        const token = localStorage.getItem('token');
-
-                        // Using fetch to match the project's style
-                        const response = await fetch(
-                            `${import.meta.env.VITE_API_URL}/api/location`,
-                            {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({ latitude, longitude })
-                            }
-                        );
-
-                        if (!response.ok) {
-                            // Try to get a specific error message from the backend
-                            const errorData = await response.json();
-                            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-                        }
-
-                        const data: LocationData = await response.json();
-                        setLocationData(data);
-
-                    } catch (apiError: any) {
-                        setError(apiError.message || 'Could not fetch location details from the server.');
-                        console.error('API Error:', apiError);
-                    } finally {
-                        setLoading(false);
-                    }
-                },
-                (geoError) => {
-                    setError(geoError.message || 'Could not get device location.');
-                    setLoading(false);
-                }
-            );
         };
 
         fetchLocation();
-    }, []);
+    }, []); // Runs only once on component mount
 
     return { locationData, error, loading };
 };

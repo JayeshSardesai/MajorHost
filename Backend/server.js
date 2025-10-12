@@ -491,128 +491,73 @@ app.get('/api/dashboard', authenticateToken, (req, res) => {
     res.json({ success: true, data: dashboardData });
 });
 
-// Wi-Fi triangulation location detection function
-async function getWiFiLocation() { return null }
-
-// GPS fallback location detection function
-async function getGPSLocation() {
-    try {
-        const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-        if (!GOOGLE_API_KEY) {
-            console.log('⚠️ Google API key not available for GPS fallback');
-            return null;
-        }
-
-        console.log('🛰️ Using GPS/IP-based geolocation as fallback...');
-
-        // Use IP-based geolocation as GPS fallback
-        const payload = { considerIp: true };
-
-        const geoRes = await axios.post(
-            `https://www.googleapis.com/geolocation/v1/geolocate?key=${GOOGLE_API_KEY}`,
-            payload
-        );
-
-        const { lat, lng } = geoRes.data.location;
-        const accuracy = geoRes.data.accuracy;
-
-        console.log(`📍 GPS fallback location: ${lat}, ${lng} (accuracy: ${accuracy}m)`);
-
-        return { lat, lng, accuracy, method: 'gps' };
-    } catch (error) {
-        console.error('❌ GPS fallback failed:', error.response?.data || error.message);
-        return null;
-    }
-}
-
 // Enhanced geolocation with Wi-Fi triangulation + GPS fallback
 app.post('/api/location', authenticateToken, async (req, res) => {
     try {
-        const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-        const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
-        const GEOCODING_API_KEY = process.env.GEOCODING_API_KEY;
-
-        if (!GOOGLE_API_KEY || !GEOCODING_API_KEY) {
-            return res.status(500).json({
-                error: 'API Keys not configured on server',
-                details: 'A Google API key for Geolocation and Geocoding is required.'
-            });
-        }
-
-        let locationResult = null;
         const { latitude, longitude } = req.body;
+        const { GOOGLE_MAPS_API_KEY, GEOCODING_API_KEY } = process.env;
 
-        // 1. Prioritize precise coordinates sent from the frontend (the new primary method)
-        if (latitude && longitude) {
-            console.log(`📍 Using coordinates provided by client: ${latitude}, ${longitude}`);
-            locationResult = { lat: latitude, lng: longitude, accuracy: 1, method: 'client-gps' };
-        }
-        // 2. If no coordinates are sent, use the server's IP address as a last resort fallback
-        else {
-            console.log('🔄 No client coordinates received. Using server IP-based fallback...');
-            locationResult = await getGPSLocation(); // This function uses the server's IP
-        }
-
-        // 3. If all methods fail, return an error
-        if (!locationResult) {
-            return res.status(500).json({
-                error: 'Failed to determine location',
-                details: 'Could not get location from client or server fallback.'
+        // This is the critical fix: Enforce that the frontend MUST provide coordinates.
+        if (!latitude || !longitude) {
+            console.error('❌ Critical Error: Frontend did not provide coordinates.');
+            return res.status(400).json({ // 400 Bad Request is more appropriate
+                error: 'Client coordinates are required',
+                details: 'The browser location must be provided in the request body.'
             });
         }
+
+        console.log(`📍 Using coordinates provided by client: ${latitude}, ${longitude}`);
+        const locationResult = { lat: latitude, lng: longitude, accuracy: 1, method: 'client-gps' };
 
         const { lat, lng, accuracy, method } = locationResult;
 
-        // 4. Reverse geocode the coordinates to get the address (state, district)
+        // Reverse geocode the coordinates to get the address (state, district)
         let state = '', district = '';
-        try {
-            const revResp = await axios.get(
-                `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=en&key=${GEOCODING_API_KEY}`
-            );
+        if (GEOCODING_API_KEY) {
+            try {
+                const revResp = await axios.get(
+                    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=en&key=${GEOCODING_API_KEY}`
+                );
 
-            if (revResp.data.status === 'OK' && revResp.data.results.length > 0) {
-                const components = revResp.data.results[0].address_components;
-                const findType = t => components.find(c => c.types.includes(t))?.long_name || '';
-                district = findType('administrative_area_level_2') || findType('locality') || findType('sublocality');
-                state = findType('administrative_area_level_1');
-                console.log(`🗺️  Address resolved: ${district}, ${state}`);
-            } else {
-                console.warn(`⚠️ Geocoding failed: ${revResp.data.status}`);
+                if (revResp.data.status === 'OK' && revResp.data.results.length > 0) {
+                    const components = revResp.data.results[0].address_components;
+                    const findType = t => components.find(c => c.types.includes(t))?.long_name || '';
+                    district = findType('administrative_area_level_2') || findType('locality') || findType('sublocality');
+                    state = findType('administrative_area_level_1');
+                    console.log(`🗺️  Address resolved: ${district}, ${state}`);
+                } else {
+                    console.warn(`⚠️ Geocoding failed: ${revResp.data.status}`);
+                }
+            } catch (geocodeErr) {
+                console.error('❌ Geocoding API request failed:', geocodeErr.message);
             }
-        } catch (geocodeErr) {
-            console.error('❌ Geocoding API request failed:', geocodeErr.message);
         }
 
         const mapUrl = GOOGLE_MAPS_API_KEY ?
             `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=12&size=640x320&markers=color:green%7C${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}` :
             null;
 
-        // 5. Store the accurate location in the user's profile for future use
+        // Store the accurate location in the user's profile for future use
         if (req.user && req.user.userId) {
-            try {
-                await User.findByIdAndUpdate(req.user.userId, {
-                    dashboardLocation: {
-                        state,
-                        district,
-                        coordinates: { lat, lng },
-                        lastUpdated: new Date(),
-                        method: method
-                    }
-                }, { new: true });
-                console.log(`✅ Successfully stored dashboard location for user ${req.user.userId}`);
-            } catch (storeErr) {
-                console.error('❌ Failed to store dashboard location:', storeErr.message);
-            }
+            await User.findByIdAndUpdate(req.user.userId, {
+                dashboardLocation: {
+                    state,
+                    district,
+                    coordinates: { lat, lng },
+                    lastUpdated: new Date()
+                }
+            }, { new: true });
+            console.log(`✅ Successfully stored dashboard location for user ${req.user.userId}`);
         }
 
-        // 6. Send the final, successful response to the frontend
+        // Send the final, successful response to the frontend
         return res.json({
             success: true,
             coordinates: { lat, lng, accuracy },
             address: { state, district },
             mapUrl,
-            method: method,
-            locationSource: method === 'client-gps' ? 'Device GPS' : 'Server IP Geolocation'
+            method,
+            locationSource: 'Device GPS'
         });
 
     } catch (err) {

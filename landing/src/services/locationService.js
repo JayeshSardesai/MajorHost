@@ -101,7 +101,7 @@ class LocationService {
         const timestamp = Date.now();
         this.cache.location = locationData;
         this.cache.timestamp = timestamp;
-        localStorage.setItem('locationCache', JSON.stringify({ data: locationData, timestamp }));
+        localStorage.setItem('locationData', JSON.stringify({ data: locationData, timestamp }));
     }
 
     /**
@@ -109,7 +109,7 @@ class LocationService {
      */
     getCachedLocation() {
         try {
-            const cached = localStorage.getItem('locationCache');
+            const cached = localStorage.getItem('locationData');
             if (!cached) return null;
 
             const { data, timestamp } = JSON.parse(cached);

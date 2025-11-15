@@ -143,13 +143,6 @@ const Dashboard = () => {
         if (locationData && locationData.coordinates) {
           const { coordinates, address } = locationData;
           console.log(`🗺️ Dashboard location fetched: ${address?.district}, ${address?.state}`);
-
-          // Store the fresh data in localStorage
-          localStorage.setItem('locationData', JSON.stringify({
-            ...locationData,
-            timestamp: new Date().toISOString()
-          }));
-
           // THIS IS THE SECOND CRITICAL STATE UPDATE
           setWeatherData(prev => ({
             ...prev,
